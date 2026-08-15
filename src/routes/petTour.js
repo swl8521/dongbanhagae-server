@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const { callTourApi } = require('../services/tourApiClient');
 const { getAreaCounts, getNativeAreaCount } = require('../services/areaCounts');
 const {
@@ -12,6 +13,16 @@ const {
 } = require('../db');
 
 const router = express.Router();
+
+// 로그인 없이 버튼 클릭만으로 호출되는 엔드포인트라 봇/스크립트로 recommend_count가
+// 쉽게 조작될 수 있다. IP당 분당 요청 수를 제한해 최소한의 어뷰징만 막는다.
+const recommendLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
+});
 
 // 상세 조회를 한 번이라도 거친 곳은 캐시된 동반 조건/추천·조회수를 목록에도 미리 반영한다.
 function enrichItems(items) {
@@ -250,7 +261,7 @@ router.get('/:contentId', async (req, res, next) => {
  * body: { recommended: boolean } -> true면 +1, false면 -1
  * ⚠️ 로그인 시스템이 없어 브라우저(localStorage) 기준 중복 방지라 완전한 어뷰징 방지는 아님
  */
-router.post('/:contentId/recommend', (req, res) => {
+router.post('/:contentId/recommend', recommendLimiter, (req, res) => {
   const { contentId } = req.params;
   const delta = req.body?.recommended ? 1 : -1;
 

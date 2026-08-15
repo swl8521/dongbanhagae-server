@@ -1,0 +1,16 @@
+services:
+  server:
+    build: .
+    container_name: dongbanhagae-server
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=4000
+    # nginx가 호스트에서 리버스 프록시를 맡으므로, 컨테이너 포트는 localhost에만 열어
+    # 외부에서 직접 접근하지 못하게 한다. 호스트 4000번은 같은 EC2의 ODK SERVER(PM2)가
+    # 이미 쓰고 있어서 4010으로 바인딩한다.
+    ports:
+      - "127.0.0.1:4010:4000"
+    volumes:
+      - ./data:/app/data

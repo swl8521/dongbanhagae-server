@@ -5,6 +5,10 @@ const petTourRouter = require('./routes/petTour');
 
 const app = express();
 
+// EC2 위에서 nginx가 리버스 프록시로 앞단에 붙는 구성이라, X-Forwarded-For를 신뢰해야
+// express-rate-limit이 nginx의 IP가 아닌 실제 클라이언트 IP 기준으로 제한을 건다.
+app.set('trust proxy', 1);
+
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
 app.use(express.json());
 

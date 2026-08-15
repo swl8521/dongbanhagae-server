@@ -1,7 +1,11 @@
+const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 
-const db = new Database(path.join(__dirname, '..', 'data', 'pet-status.sqlite'));
+const dataDir = path.join(__dirname, '..', 'data');
+fs.mkdirSync(dataDir, { recursive: true });
+
+const db = new Database(path.join(dataDir, 'pet-status.sqlite'));
 
 db.pragma('journal_mode = WAL');
 
