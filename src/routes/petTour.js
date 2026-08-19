@@ -223,24 +223,28 @@ router.get('/area-counts', async (req, res, next) => {
 
 /**
  * GET /api/pet-facilities/:contentId
- * -> 시설 상세 정보 (공통정보 + 반려동물 동반 조건)
+ * -> 시설 상세 정보 (공통정보 + 반려동물 동반 조건 + 이미지 갤러리)
  * detailCommon2: 이름/주소/개요/좌표
  * detailPetTour2: 동반 가능 구역, 크기 제한, 필수 준수사항 등
+ * detailImage2: 등록된 추가 이미지 목록 (없는 시설이 많아 실패해도 무시)
  *   ⚠️ detailCommon2는 defaultYN/overviewYN/addrinfoYN/mapinfoYN 파라미터를 받지 않음 (detailCommon1과 다름)
  */
 router.get('/:contentId', async (req, res, next) => {
   try {
     const { contentId } = req.params;
 
-    const [common, petInfo] = await Promise.all([
+    const [common, petInfo, imageInfo] = await Promise.all([
       callTourApi('detailCommon2', { contentId }),
       callTourApi('detailPetTour2', { contentId }).catch(() => null),
+      callTourApi('detailImage2', { contentId, imageYN: 'Y' }).catch(() => null),
     ]);
 
     const commonRaw = common?.response?.body?.items?.item ?? null;
     const petRaw = petInfo?.response?.body?.items?.item ?? null;
+    const imageRaw = imageInfo?.response?.body?.items?.item ?? [];
     const commonItem = Array.isArray(commonRaw) ? commonRaw[0] : commonRaw;
     const petItem = Array.isArray(petRaw) ? petRaw[0] : petRaw;
+    const imageItems = Array.isArray(imageRaw) ? imageRaw : [imageRaw].filter(Boolean);
 
     if (!commonItem) {
       return res.status(404).json({ message: '해당 시설 정보를 찾을 수 없습니다.' });
@@ -256,6 +260,9 @@ router.get('/:contentId', async (req, res, next) => {
     res.json({
       common: commonItem,
       pet: petItem,
+      images: imageItems
+        .map((img) => ({ url: img.originimgurl, thumbnailUrl: img.smallimageurl }))
+        .filter((img) => img.url),
       stats: {
         viewCount: stats?.view_count ?? 0,
         recommendCount: stats?.recommend_count ?? 0,
