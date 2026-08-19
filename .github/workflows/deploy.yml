@@ -1,0 +1,34 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: docker build -t dongbanhagae-server-server .
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -T 10 -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts || true
+          test -s ~/.ssh/known_hosts
+
+      # 이 EC2의 buildx가 낡아서(0.12.1) docker compose build가 안 되기 때문에,
+      # 이미지는 여기 러너에서 빌드해서 그대로 tar로 실어 보낸다.
+      # deploy-server 계정은 docker 그룹에 없고(도커 그룹=사실상 root 권한이라 부여하지 않음),
+      # /etc/sudoers.d/deploy-server에 등록된 이 두 명령만 sudo로 실행할 수 있다.
+      - name: Ship image and redeploy
+        run: |
+          docker save dongbanhagae-server-server | gzip | \
+            ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            'gunzip | sudo docker load'
+          ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            'sudo docker compose -f /home/ec2-user/git/dongbanhagae-server/docker-compose.yml up -d --force-recreate'
