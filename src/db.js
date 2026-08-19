@@ -147,6 +147,26 @@ function getContentIdsByAreaCode(areaCode) {
   return new Set(rows.map((row) => row.content_id));
 }
 
+// 사용자가 "이 정보가 실제와 달라요"로 남긴 자유 텍스트 제보. 로그인이 없어 신고자를
+// 특정할 수 없으므로 우선은 쌓아두기만 하고, 검토/반영은 운영자가 수동으로 확인한다.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS facility_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content_id TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )
+`);
+
+const insertReportStmt = db.prepare(`
+  INSERT INTO facility_reports (content_id, message, created_at)
+  VALUES (?, ?, ?)
+`);
+
+function insertFacilityReport(contentId, message) {
+  insertReportStmt.run(contentId, message, new Date().toISOString());
+}
+
 // TourAPI 응답 캐시를 파일 DB에 저장해 서버 재시작(nodemon 등)에도 살아남게 한다.
 // 인메모리 캐시(node-cache)는 재시작 때마다 비어서 하루 호출 한도(1,000회)를
 // 개발 중 재시작만으로 다 태워버리는 문제가 있었다.
@@ -195,4 +215,5 @@ module.exports = {
   getContentIdsByAreaCode,
   getCache,
   setCache,
+  insertFacilityReport,
 };

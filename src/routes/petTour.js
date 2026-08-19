@@ -10,6 +10,7 @@ const {
   getStatsMap,
   getCheckedAreaContentIds,
   getContentIdsByAreaCode,
+  insertFacilityReport,
 } = require('../db');
 
 const router = express.Router();
@@ -19,6 +20,15 @@ const router = express.Router();
 const recommendLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
+});
+
+// 제보는 자유 텍스트 입력이 있는 폼이라 recommend보다 어뷰징 비용이 크므로 더 낮게 제한한다.
+const reportLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
@@ -267,6 +277,24 @@ router.post('/:contentId/recommend', recommendLimiter, (req, res) => {
 
   const recommendCount = adjustRecommendCount(contentId, delta);
   res.json({ recommendCount });
+});
+
+/**
+ * POST /api/pet-facilities/:contentId/report
+ * body: { message } -> 반려동물 동반 조건 등 정보가 실제와 다르다는 사용자 제보 저장
+ * ⚠️ 로그인이 없어 신고자를 특정할 수 없고, 자유 텍스트를 받으므로 길이 제한 + IP 레이트리밋만 적용.
+ *    검토/반영은 운영자가 facility_reports 테이블을 직접 확인해 수동으로 처리한다 (관리 화면은 아직 없음).
+ */
+router.post('/:contentId/report', reportLimiter, (req, res) => {
+  const { contentId } = req.params;
+  const message = (req.body?.message || '').toString().trim().slice(0, 300);
+
+  if (!message) {
+    return res.status(400).json({ message: '제보 내용을 입력해주세요.' });
+  }
+
+  insertFacilityReport(contentId, message);
+  res.json({ ok: true });
 });
 
 module.exports = router;
